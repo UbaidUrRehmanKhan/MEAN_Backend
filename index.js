@@ -24,6 +24,8 @@ const mongoose = require('mongoose'); // Node Tool for MongoDB
 const config = require('./config/database'); // Mongoose Config
 const authentication = require('./routes/authentication')(router); // Import Authentication Routes
 const bodyParser = require('body-parser')
+var cors = require('cors')
+
 // Database Connection
 mongoose.Promise = global.Promise;
 mongoose.connect(config.uri, {useNewUrlParser: true}, (err) => {
@@ -33,6 +35,9 @@ mongoose.connect(config.uri, {useNewUrlParser: true}, (err) => {
     console.log('Connected to database: ' + config.db);
   }
 },);
+
+app.use(cors({ origin: 'http://localhost:4200' }));
+
 // parse application/x-www-form-urlencoded
 app.use(bodyParser.urlencoded({ extended: false }))
  
