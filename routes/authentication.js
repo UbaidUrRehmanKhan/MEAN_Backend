@@ -1,4 +1,8 @@
 const User = require('../models/user');
+const bcrypt = require('bcrypt'); // A native JS bcrypt library for NodeJS
+const jwt = require('jsonwebtoken'); // Compact, URL-safe means of representing claims to be transferred between two parties.
+const config = require('../config/database'); // Import database configuration
+
 module.exports = (router) => {
     router.post('/register', (req, res) => {
         if (!req.body.email) {
@@ -13,11 +17,26 @@ module.exports = (router) => {
                     res.json({ success: false, message: 'You must provide password' });
                 }
                 else {
-                    let user = new User({
-                        email: req.body.email.toLowerCase(),
-                        username: req.body.username.toLowerCase(),
-                        password: req.body.password
+                  let user;
+                  if(req.body.role) {
+                    console.log("adfd");
+                    user = new User({
+                      email: req.body.email.toLowerCase(),
+                      username: req.body.username.toLowerCase(),
+                      password: req.body.password,
+                      role: req.body.role.toLowerCase()
                     });
+                  }
+                  else {
+                    user = new User({
+                      email: req.body.email.toLowerCase(),
+                      username: req.body.username.toLowerCase(),
+                      password: req.body.password
+                    });
+                  }
+                    console.log(user);
+                    user.password = bcrypt.hashSync( user.password, 10);
+                    
                     // Save user to database
                     user.save((err) => { 
                         if(err){
@@ -79,26 +98,60 @@ module.exports = (router) => {
       });
 
     router.get('/checkUsername/:username', (req, res) => {
-    // Check if username was provided in paramaters
-    if (!req.params.username) {
-        res.json({ success: false, message: 'Username was not provided' }); // Return error
-    } else {
-        // Look for username in database
-        User.findOne({ username: req.params.username }, (err, user) => {
-        // Check if connection error was found
-        if (err) {
-            res.json({ success: false, message: err }); // Return connection error
+        // Check if username was provided in paramaters
+        if (!req.params.username) {
+            res.json({ success: false, message: 'Username was not provided' }); // Return error
         } else {
-            // Check if user's username was found
-            if (user) {
-            res.json({ success: false, message: 'Username is already taken' }); // Return as taken username
+            // Look for username in database
+            User.findOne({ username: req.params.username }, (err, user) => {
+            // Check if connection error was found
+            if (err) {
+                res.json({ success: false, message: err }); // Return connection error
             } else {
-            res.json({ success: true, message: 'Username is available' }); // Return as vailable username
+                // Check if user's username was found
+                if (user) {
+                res.json({ success: false, message: 'Username is already taken' }); // Return as taken username
+                } else {
+                res.json({ success: true, message: 'Username is available' }); // Return as vailable username
+                }
             }
+            });
         }
-        });
-    }
     });  
+
+    router.post('/login', (req, res) => {
+        // Check if username was provided
+        if (!req.body.username) {
+          res.json({ success: false, message: 'No username was provided' }); // Return error
+        } else {
+          // Check if password was provided
+          if (!req.body.password) {
+            res.json({ success: false, message: 'No password was provided.' }); // Return error
+          } else {
+            // Check if username exists in database
+            User.findOne({ username: req.body.username.toLowerCase() }, (err, user) => {
+              // Check if error was found
+              if (err) {
+                res.json({ success: false, message: err }); // Return error
+              } else {
+                // Check if username was found
+                if (!user) {
+                  let obj = { success: false, message: 'Username not found.' };
+                  res.json(obj); // Return error
+                } else {
+                  if(user.comparePassword(req.body.password, user.password)){
+                    const token = jwt.sign({ userId: user._id }, config.secret, { expiresIn: '24h' }); // Create a token for client
+                    res.json({ success: true, message: 'Success!', token: token, username: user.username, role: user.role  }); // Return success and token to frontend
+                  }
+                  else {
+                    res.json({ success: false, message: 'Password invalid' }); // Return error
+                  } 
+                }
+              }
+            });
+          }
+        }
+      });
 
     return router;
 }
